@@ -4,12 +4,13 @@
 # @Author  : 钟昊天2021280300
 # @FileName: get_Data.py
 # @Software: PyCharm
-
+from datetime import datetime, timedelta
 import gzip
 import json
 import zlib
 
 import brotli
+import pandas as pd
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -91,13 +92,24 @@ def get_baidu_index_data(keyword, cookie_string):
     # 执行所有 ActionChains 中存储的行为
     actions.perform()
     ptbk = fetch_data("Interface/ptbk", browser)['data']
-    data = fetch_data("api/SearchApi/index", browser)['data']
+    data_all = fetch_data("api/SearchApi/index", browser)
+    data = data_all['data']
+    #startDate = data_all['startDate']
+
     results = {}
     for userIndexe in data['userIndexes']:
         name = userIndexe['word'][0]['name']
         index_data = userIndexe['all']['data']
+        startDate = userIndexe['all']['startDate']
         r = decrypt(ptbk, index_data)
-        results[name] = r
+        start_date = datetime.strptime(startDate, '%Y-%m-%d')
+
+        # Split the string into a list of values and convert them to integers
+        values = list(map(int, r.split(',')))
+
+        # Create a list of tuples with the date and the corresponding value
+        date_value_tuples = [(start_date + timedelta(days=i), value) for i, value in enumerate(values)]
+        results = date_value_tuples
     return results
 
 
@@ -119,6 +131,11 @@ index_data_all = {}
 for keyword in keywords:
     index_data = get_baidu_index_data(keyword + '\n', cookie_string)
     index_data_all[keyword] = index_data
+    # columns = ['Values']中的Values自行修改为对应的列标
+    df = pd.DataFrame(index_data, columns=['Date', 'Value'])
+    df['Date'] = df['Date'].dt.date
+    file_path = './'+keyword+'.xlsx'
+    df.to_excel(file_path, index=False)
     print(f"百度指数数据 for '{keyword}': {index_data}")
 
 print("所有关键词的百度指数数据:")
